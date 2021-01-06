@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Title</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+	<div class="body-wrapper">
+		<div class="header-wrapper">
+			<i class="fas fa-user"></i>
+			<i class="fab fa-html5"></i>
+			<i class="fas fa-search"></i>
+		</div>
+		<div class="content-wrapper">
+			<div class="days-section">
+				<div class="star-box">
+					<i class="fas fa-star"></i>
+				</div>
+				<div class="days">
+					<div class="day day-1">
+						<div class="day-text">Mon</div>
+						<div class="day-time">09:04</div>
+					</div>
+					<div class="day day-2">
+						<div class="day-text">Tue</div>
+						<div class="day-time">09:04</div>
+					</div>
+					<div class="day day-3 ">
+						<div class="day-text">Wed</div>
+						<div class="day-time">09:04</div>
+					</div>
+					<div class="day day-4">
+						<div class="day-text">Thu</div>
+						<div class="day-time">09:04</div>
+					</div>
+					<div class="day day-5 active">
+						<div class="day-text">Fri</div>
+						<div class="day-time">00:00</div>
+					</div>
+					<div class="day day-6">
+						<div class="day-text">Sat</div>
+						<div class="day-time">09:04</div>
+					</div>
+					<div class="day day-7">
+						<div class="day-text">Sun</div>
+						<div class="day-time">09:04</div>
+					</div>
+				</div>
+			</div>
+			<div class="program-section">
+				<div class="cursor"></div>
+				<div class="time-section">
+					<div class="empty-space"></div>
+					<div class="times">
+						<div class="cursor-pin"></div>
+					</div>
+				</div>
+				<div class="channel-section">
+					<div class="channel-list"></div>
+					<div class="channel-program-list"></div>
+				</div>
+			</div>
+			<div class="now-section">
+				<button id="now">Now</button>
+			</div>
+		</div>
+	</div>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+	<script type="text/javascript" src="data.json"></script>
+	<script src="https://kit.fontawesome.com/a076d05399.js"></script>
+	<script type="text/javascript">
+		$(document).ready(function(){
+			var TIMEWIDTH = 6; // determines pixel length of episode
+			var SCREENMOVE = 60; // how fast screen move when pin moves
+
+			// hourly time
+			for(var i = 0; i < 24; i++){
+				var hour = (i < 10 ? '0' : '') + i;
+				$(".times").append(
+					'<div class="time" data-hour="'+hour+'" style="width: '+ 60 * TIMEWIDTH +'px">'+
+						'<div class="time-text">'+hour+':00</div>'+
+					'</div>'
+				)
+			}
+
+			// channel and schedule
+			var channels = "";
+			var schedules = "";
+			for(var i = 0; i < data.channels.length; i++){
+				// channel variable
+				var channel = data.channels[i];
+
+				// channel logo
+				var logo = channel.images.logo;
+				channels += '<div class="channel">'+
+								'<img src="'+logo+'">'+
+							'</div>';
+
+				// channel schedules
+				schedules = '<div class="schedule-list">';
+				for(var j = 0; j < channel.schedules.length; j++){
+					var schedule = channel.schedules[j];
+					
+					var start = new Date(schedule.start);
+					var startHou = (start.getHours()<10?'0':'') + start.getHours()
+					var startMin = (start.getMinutes()<10?'0':'') + start.getMinutes();
+					
+					var end = new Date(schedule.end);
+					var endHou = (end.getHours()<10?'0':'') + end.getHours()
+					var endMin = (end.getMinutes()<10?'0':'') + end.getMinutes();
+
+					var minutes = (end - start) / 1000 / 60;
+					schedules += '<div class="schedule" style="width: '+ (minutes * TIMEWIDTH) +'px">'+
+									'<div class="schedule-text">'+
+										schedule.title+
+									'</div>'+
+									'<div class="schedule-time">'+
+										startHou + ":" + startMin + " - " +
+										endHou + ":" + endMin  +
+									'</div>'+
+								'</div>';
+				}
+				schedules += '</div';
+				$(".channel-program-list").append(schedules);
+			}
+
+			// adding left channel icons
+			$(".channel-list").html(channels);
+
+
+			/****** Start of movement function ********/
+			var xCordinate = -1;
+			var peakAnimation = false; // represents if end and start position pin animataion started
+			
+			// enable move only once mousedown
+			$(".cursor").on("mousedown", function(){
+				// enable move
+				$("html, body").on("mousemove", function(e){
+					e.preventDefault();
+					moveSlider(e.clientX);
+					xCordinate = e.clientX;
+				})
+			})
+
+			// disable move
+			$("html, body").on("mouseup", function(){
+				peakAnimation = false; // stop start and end animation once mouse key up
+				$("html, body").off("mousemove") // disable mousemove which was added while mousedown
+			})
+
+			var left 			= 0;
+			var previousPos 	= -1;
+			var windowWidth 	= $(window).width();
+			var programsWidth 	= $(".channel-program-list").width();
+			var channelEpisodesBoxWidth = $(".channel-section").width() - $(".channel-list").width();
+			var inViewEpisodeBoxWidth = windowWidth - channelLogoBoxWidth;
+			var channelLogoBoxWidth = $(".channel-list").width();
+			
+			function moveSlider(leftPos){
+				var isRightEnd 	= false;
+				var isLeftEnd 	= false;
+
+				if( leftPos < channelLogoBoxWidth ){ // check if already at start
+					isLeftEnd = true;
+				}
+				else if( (leftPos+10) >= (windowWidth - channelLogoBoxWidth)){
+					isRightEnd = true;
+				}
+				else{
+					$(".cursor").css("left", leftPos + "px");
+				}
+
+				if(isRightEnd){ // move right
+					if(!peakAnimation){
+						peakAnimation = true;
+						startRightAnimation();
+					}
+				}
+				else if(isLeftEnd){ // move left
+					if(!peakAnimation){
+						peakAnimation = true;
+						$(".cursor").css("left", channelLogoBoxWidth + "px");
+						startLeftAnimation();
+					}
+				}
+				else if(left < leftPos){ // normal slider pin movement
+					left = leftPos - channelLogoBoxWidth;
+					peakAnimation = false;
+				}
+				
+				$(".channel-program-list, .times").css("left", "-"+left+"px");
+				previousPos = left;
+
+				highlightBoxes();
+			}
+
+			function startRightAnimation(){
+				if(peakAnimation){
+					setTimeout(function(){
+						var windowWidth 	= $(window).width();
+						if ( xCordinate < windowWidth - channelLogoBoxWidth ) {
+							peakAnimation = false;
+							return;
+						}
+						if(left + SCREENMOVE <= (programsWidth - channelEpisodesBoxWidth) ){
+							left += SCREENMOVE;
+							$(".channel-program-list, .times").css("left", "-"+left+"px");
+							startRightAnimation();
+						}
+						highlightBoxes();
+					}, 100)
+				}
+			}
+
+			function startLeftAnimation(){
+				if(peakAnimation){
+					setTimeout(function(){
+						left -= SCREENMOVE;
+						if(xCordinate > channelLogoBoxWidth || left < 0){ // end if cursor is bought to right
+							peakAnimation = false;
+							return;
+						}
+						$(".channel-program-list, .times").css("left", "-"+left+"px");
+						startLeftAnimation();
+						highlightBoxes();
+					}, 100)
+				}
+			}
+
+			function highlightBoxes(){
+				// programs active
+				var leftPosition 	= $(".channel-program-list").position().left;
+				var pinPosition 	= $(".cursor").position().left;
+				$(".schedule").removeClass("active");
+				$(".schedule-list").each(function(){
+					$(this).find(".schedule").each(function(){
+						var pos = $(this)[0].getBoundingClientRect().left;
+						if(pinPosition >= pos && pinPosition <= (pos + $(this).outerWidth())){ // if current episode
+							$(this).attr("data-pos", pos)
+							$(this).addClass("active")	
+							return;
+						}
+					})
+				})
+
+				// time on top update
+				var hourWidth = $(".time").width();
+				var minuteWidth = hourWidth / 60;
+				$(".time").removeClass("active")
+				$(".times .time").each(function(){
+					var pos = $(this)[0].getBoundingClientRect().left;
+					if(pinPosition >= pos && pinPosition <= (pos + $(this).outerWidth())){ // if current hour
+						$(this).addClass("active")
+						var hour = $(this).attr("data-hour");
+						var dragMinuteWidth = pinPosition - pos;
+						var minutes = Math.floor(dragMinuteWidth/minuteWidth);
+						minutes = (minutes < 10) ? "0" + minutes: minutes;
+						$(".day.active .day-time").html(hour+":"+minutes) 
+						return;
+					}
+				})
+			}
+
+			
+			// now button
+			$("#now").click(function(){
+				var now = new Date();
+			   	var viewAdjustment = 200;
+				var hour = now.getHours();
+				hour = ((hour < 10) ? '0' : '') + hour;
+				
+				var minutes = now.getMinutes();
+				minutes = ((minutes < 10) ? '0' : '') + minutes.toString();
+
+				var leftMovePosition = $(".time[data-hour='"+ hour +"']").position().left + (minutes * TIMEWIDTH );
+				if(leftMovePosition > (programsWidth - channelEpisodesBoxWidth)){
+					leftMovePosition = programsWidth - channelEpisodesBoxWidth;
+					viewAdjustment = 0;
+				}
+				$(".channel-program-list, .times").css("left", "-"+(leftMovePosition - viewAdjustment)+"px");
+
+				var temp = $(".times .time[data-hour='"+ hour +"']")[0].getBoundingClientRect().left + (minutes * TIMEWIDTH );
+				$(".cursor").css("left", (temp)+"px");
+				
+				highlightBoxes()
+				left = leftMovePosition;
+			})
+		})
+	</script>
+</body>
+</html>
